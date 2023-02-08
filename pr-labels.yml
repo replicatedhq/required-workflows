@@ -13,4 +13,4 @@ jobs:
       with:
         mode: exactly
         count: 1
-        labels: "type::security, type::feature, type::bug, type::chore, type::docs"
+        labels: "type::security, type::feature, type::bug, type::chore"
