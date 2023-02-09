@@ -27,10 +27,14 @@ async function run() {
         ...github.context.repo,
         issue_number: github.context.issue.number,
       })
-    ).data;
+    ).data.map((label) => label.name);
+    core.debug(`Found labels: ${labels.join(", ")}`);
 
     // ensure exactly one primary label is set
-    const primaryLabels = PRIMARY_LABELS.filter((label) => labels.includes(label));
+    const primaryLabels = PRIMARY_LABELS.filter((label) =>
+      labels.includes(label)
+    );
+    core.debug(`Found primary labels: ${primaryLabels.join(", ")}`);
     if (primaryLabels.length !== 1) {
       throw new Error(
         `Exactly one primary label must be set. Found: ${primaryLabels.join(
@@ -42,6 +46,7 @@ async function run() {
     // if the primary label is a bug, ensure a bug label is set
     if (primaryLabels[0] === "type::bug") {
       const bugLabels = BUG_LABELS.filter((label) => labels.includes(label));
+      core.debug(`type::bug is set, found bug labels: ${bugLabels.join(", ")}`);
       if (bugLabels.length !== 1) {
         throw new Error(
           `Exactly one bug label must be set for primary type::bug. Found: ${bugLabels.join(
@@ -52,7 +57,10 @@ async function run() {
     }
 
     // ensure no more than one severity label is set
-    const severityLabels = SEVERITY_LABELS.filter((label) => labels.includes(label));
+    const severityLabels = SEVERITY_LABELS.filter((label) =>
+      labels.includes(label)
+    );
+    core.debug(`Found severity labels: ${severityLabels.join(", ")}`);
     if (severityLabels.length > 1) {
       throw new Error(
         `No more than one severity label may be set. Found: ${severityLabels.join(
@@ -60,7 +68,6 @@ async function run() {
         )}`
       );
     }
-
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message);
   }
