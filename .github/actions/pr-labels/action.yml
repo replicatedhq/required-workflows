@@ -1,0 +1,11 @@
+name: "Check PR labels"
+description: "Check required PR labels are present"
+author: "Replicated"
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
+inputs:
+  token:
+    description: The GitHub token to use when calling the API
+    default: ${{ github.token }}
+    required: false

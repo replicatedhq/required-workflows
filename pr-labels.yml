@@ -4,13 +4,15 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - labeled
+      - unlabeled
+      - synchronize
     
 jobs:
-  enforce-labels:
+  check-labels:
+    name: Check required PR labels are present
     runs-on: ubuntu-22.04
     steps:
-    - uses: mheap/github-action-required-labels@v3
-      with:
-        mode: exactly
-        count: 1
-        labels: "type::security, type::feature, type::bug, type::chore"
+    - uses: ./.github/actions/pr-labels
