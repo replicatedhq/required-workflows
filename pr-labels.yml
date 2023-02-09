@@ -15,4 +15,4 @@ jobs:
     name: Check required PR labels are present
     runs-on: ubuntu-22.04
     steps:
-    - uses: ./.github/actions/pr-labels
+    - uses: replicatedhq/required-workflows/.github/actions/pr-labels@main
