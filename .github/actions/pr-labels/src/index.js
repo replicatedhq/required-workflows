@@ -37,9 +37,7 @@ async function run() {
     core.debug(`Found primary labels: ${primaryLabels.join(", ")}`);
     if (primaryLabels.length !== 1) {
       throw new Error(
-        `Exactly one primary label must be set. Found: ${primaryLabels.join(
-          ", "
-        )}`
+        `Exactly one primary label must be set from [${PRIMARY_LABELS.join(", ")}]. Found: ${primaryLabels.join(", ")}`
       );
     }
 
