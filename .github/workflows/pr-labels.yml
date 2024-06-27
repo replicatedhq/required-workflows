@@ -14,5 +14,7 @@ jobs:
   check-labels:
     name: Check required PR labels are present
     runs-on: ubuntu-22.04
+    permissions:
+      pull-requests: write
     steps:
     - uses: replicatedhq/required-workflows/.github/actions/pr-labels@main
