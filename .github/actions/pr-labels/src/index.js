@@ -54,6 +54,9 @@ async function run() {
     // set up github client
     const octokit = github.getOctokit(token);
 
+    // Track if we added a label based on semantic commit
+    let addedSemanticLabel = false;
+
     // fetch the list of labels
     const labels = (
       await octokit.rest.issues.listLabelsOnIssue({
@@ -103,6 +106,29 @@ async function run() {
 
         // Update our local labels array to include the new label
         labels.push(labelToAdd);
+        addedSemanticLabel = true;
+
+        // If we just added a label, give it time to apply
+        if (addedSemanticLabel) {
+          core.info("Added label based on semantic commit message. Waiting for label to apply...");
+          // Short delay to allow the label to be properly registered
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // Refetch the labels to ensure we have the most up-to-date set
+          core.info("Refetching labels after adding semantic label...");
+          const updatedLabelsResponse = await octokit.rest.issues.listLabelsOnIssue({
+            ...github.context.repo,
+            issue_number: github.context.issue.number,
+          });
+
+          // Update our labels array with the freshly fetched labels
+          const updatedLabels = updatedLabelsResponse.data.map((label) => label.name);
+          core.debug(`Updated labels after adding semantic label: ${updatedLabels.join(", ")}`);
+
+          // Replace our labels array with the updated one
+          labels.length = 0;
+          updatedLabels.forEach(label => labels.push(label));
+        }
       }
     }
 
@@ -111,6 +137,7 @@ async function run() {
       labels.includes(label)
     );
     core.debug(`Found primary labels: ${primaryLabels.join(", ")}`);
+
     if (primaryLabels.length !== 1) {
       throw new Error(
         `Exactly one primary label must be set from [${PRIMARY_LABELS.join(", ")}]. Found: ${primaryLabels.join(", ")}`
