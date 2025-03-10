@@ -9,7 +9,7 @@ on:
       - labeled
       - unlabeled
       - synchronize
-    
+
 jobs:
   check-labels:
     name: Check required PR labels are present
