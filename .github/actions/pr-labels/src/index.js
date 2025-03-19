@@ -61,9 +61,6 @@ async function run() {
     const octokit = github.getOctokit(token);
     core.debug("GitHub client initialized");
 
-    // Track if we added a label based on semantic commit
-    let addedSemanticLabel = false;
-
     // fetch the list of labels
     core.debug("Fetching current PR labels...");
     const labels = (
@@ -79,102 +76,7 @@ async function run() {
       core.info("Labels already exist on PR, skipping adding new labels");
     } else {
       // Get PR details to check for semantic commit messages
-      const prNumber = github.context.issue.number;
-      core.debug(`Processing PR #${prNumber}`);
-
-      core.debug("Fetching PR details...");
-      const { data: pullRequest } = await octokit.rest.pulls.get({
-        ...github.context.repo,
-        pull_number: prNumber,
-      });
-
-      // Get the PR title and HEAD commit message
-      const prTitle = pullRequest.title;
-      core.debug(`PR title: "${prTitle}"`);
-
-      // Get the HEAD commit message
-      core.debug("Fetching PR commits...");
-      const { data: commits } = await octokit.rest.pulls.listCommits({
-        ...github.context.repo,
-        pull_number: prNumber,
-      });
-
-      core.debug(`Found ${commits.length} commits in PR`);
-      const headCommitMessage = commits.length > 0 ? commits[commits.length - 1].commit.message : null;
-      if (headCommitMessage) {
-        core.debug(`HEAD commit message: "${headCommitMessage}"`);
-      } else {
-        core.debug("No HEAD commit message found");
-      }
-
-      // Try to extract semantic type from PR title or HEAD commit
-      core.debug("Extracting semantic type from PR title...");
-      const prTitleType = extractSemanticType(prTitle);
-
-      core.debug("Extracting semantic type from HEAD commit...");
-      const commitType = extractSemanticType(headCommitMessage);
-
-      // Use PR title type first, then fall back to commit type
-      const semanticType = prTitleType || commitType;
-      if (semanticType) {
-        core.debug(`Using semantic type: "${semanticType}"`);
-      } else {
-        core.debug("No semantic type found in PR title or HEAD commit");
-      }
-
-      // If we found a semantic type that maps to one of our labels, add it if not present
-      if (semanticType && SEMANTIC_TYPE_TO_LABEL[semanticType]) {
-        const labelToAdd = SEMANTIC_TYPE_TO_LABEL[semanticType];
-        core.debug(`Semantic type "${semanticType}" maps to label "${labelToAdd}"`);
-
-        // Only add the label if it's not already present
-        if (!labels.includes(labelToAdd)) {
-          core.info(`Adding label ${labelToAdd} based on semantic commit type: ${semanticType}`);
-
-          core.debug("Calling GitHub API to add label...");
-          await octokit.rest.issues.addLabels({
-            ...github.context.repo,
-            issue_number: prNumber,
-            labels: [labelToAdd],
-          });
-          core.debug("Label added successfully via API");
-
-          // Update our local labels array to include the new label
-          labels.push(labelToAdd);
-          addedSemanticLabel = true;
-          core.debug(`Updated local labels array: ${labels.join(", ")}`);
-
-          // If we just added a label, give it time to apply
-          if (addedSemanticLabel) {
-            core.info("Added label based on semantic commit message. Waiting for label to apply...");
-            // Short delay to allow the label to be properly registered
-            core.debug("Waiting 2 seconds for label to propagate...");
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            core.debug("Wait completed");
-
-            // Refetch the labels to ensure we have the most up-to-date set
-            core.info("Refetching labels after adding semantic label...");
-            core.debug("Calling GitHub API to get updated labels...");
-            const updatedLabelsResponse = await octokit.rest.issues.listLabelsOnIssue({
-              ...github.context.repo,
-              issue_number: github.context.issue.number,
-            });
-
-            // Update our labels array with the freshly fetched labels
-            const updatedLabels = updatedLabelsResponse.data.map((label) => label.name);
-            core.debug(`Refetched ${updatedLabels.length} labels: ${updatedLabels.join(", ")}`);
-
-            // Replace our labels array with the updated one
-            labels.length = 0;
-            updatedLabels.forEach(label => labels.push(label));
-            core.debug(`Updated local labels array after refetch: ${labels.join(", ")}`);
-          }
-        } else {
-          core.debug(`Label "${labelToAdd}" already exists on PR, no need to add it`);
-        }
-      } else if (semanticType) {
-        core.debug(`Semantic type "${semanticType}" does not map to any of our labels`);
-      }
+      await addSemanticLabels(octokit, labels);
     }
 
     // ensure exactly one primary label is set
@@ -228,6 +130,112 @@ async function run() {
     core.debug(`Error caught: ${error.message}`);
     if (error instanceof Error) core.setFailed(error.message);
   }
+}
+
+/**
+ * Add labels based on semantic commit messages
+ * @param {object} octokit - GitHub API client
+ * @param {string[]} labels - Current labels array to update
+ * @returns {Promise<void>}
+ */
+async function addSemanticLabels(octokit, labels) {
+  const prNumber = github.context.issue.number;
+  core.debug(`Processing PR #${prNumber}`);
+
+  core.debug("Fetching PR details...");
+  const { data: pullRequest } = await octokit.rest.pulls.get({
+    ...github.context.repo,
+    pull_number: prNumber,
+  });
+
+  // Get the PR title and HEAD commit message
+  const prTitle = pullRequest.title;
+  core.debug(`PR title: "${prTitle}"`);
+
+  // Get the HEAD commit message
+  core.debug("Fetching PR commits...");
+  const { data: commits } = await octokit.rest.pulls.listCommits({
+    ...github.context.repo,
+    pull_number: prNumber,
+  });
+
+  core.debug(`Found ${commits.length} commits in PR`);
+  const headCommitMessage = commits.length > 0 ? commits[commits.length - 1].commit.message : null;
+  if (headCommitMessage) {
+    core.debug(`HEAD commit message: "${headCommitMessage}"`);
+  } else {
+    core.debug("No HEAD commit message found");
+  }
+
+  // Try to extract semantic type from PR title or HEAD commit
+  core.debug("Extracting semantic type from PR title...");
+  const prTitleType = extractSemanticType(prTitle);
+
+  core.debug("Extracting semantic type from HEAD commit...");
+  const commitType = extractSemanticType(headCommitMessage);
+
+  // Use PR title type first, then fall back to commit type
+  const semanticType = prTitleType || commitType;
+  if (semanticType) {
+    core.debug(`Using semantic type: "${semanticType}"`);
+  } else {
+    core.debug("No semantic type found in PR title or HEAD commit");
+    return;
+  }
+
+  // If we found a semantic type that maps to one of our labels, add it if not present
+  if (!semanticType || !SEMANTIC_TYPE_TO_LABEL[semanticType]) {
+    if (semanticType) {
+      core.debug(`Semantic type "${semanticType}" does not map to any of our labels`);
+    }
+    return;
+  }
+
+  const labelToAdd = SEMANTIC_TYPE_TO_LABEL[semanticType];
+  core.debug(`Semantic type "${semanticType}" maps to label "${labelToAdd}"`);
+
+  // Only add the label if it's not already present
+  if (labels.includes(labelToAdd)) {
+    core.debug(`Label "${labelToAdd}" already exists on PR, no need to add it`);
+    return;
+  }
+
+  core.info(`Adding label ${labelToAdd} based on semantic commit type: ${semanticType}`);
+
+  core.debug("Calling GitHub API to add label...");
+  await octokit.rest.issues.addLabels({
+    ...github.context.repo,
+    issue_number: prNumber,
+    labels: [labelToAdd],
+  });
+  core.debug("Label added successfully via API");
+
+  // Update our local labels array to include the new label
+  labels.push(labelToAdd);
+  core.debug(`Updated local labels array: ${labels.join(", ")}`);
+
+  core.info("Added label based on semantic commit message. Waiting for label to apply...");
+  // Short delay to allow the label to be properly registered
+  core.debug("Waiting 2 seconds for label to propagate...");
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  core.debug("Wait completed");
+
+  // Refetch the labels to ensure we have the most up-to-date set
+  core.info("Refetching labels after adding semantic label...");
+  core.debug("Calling GitHub API to get updated labels...");
+  const updatedLabelsResponse = await octokit.rest.issues.listLabelsOnIssue({
+    ...github.context.repo,
+    issue_number: github.context.issue.number,
+  });
+
+  // Update our labels array with the freshly fetched labels
+  const updatedLabels = updatedLabelsResponse.data.map((label) => label.name);
+  core.debug(`Refetched ${updatedLabels.length} labels: ${updatedLabels.join(", ")}`);
+
+  // Replace our labels array with the updated one
+  labels.length = 0;
+  updatedLabels.forEach(label => labels.push(label));
+  core.debug(`Updated local labels array after refetch: ${labels.join(", ")}`);
 }
 
 run();
