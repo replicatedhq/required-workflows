@@ -2,7 +2,7 @@
 Common workflows required for some or all replicatedhq repos
 
 ## Workflows
-* **pr-labels.yml**: Fails if a PR does not have the necessary labels for Engineering metrics, will apply primary labels if the PR title or `HEAD` commit message contains a semantic commit, for example:
+* **pr-labels.yml**: Fails if a PR does not have the necessary labels for Engineering metrics, will apply primary labels if the PR title contains a semantic type, for example:
     * `feat(ci)`, `feature(ci)`: Adds `type::feature`
     * `bug(ci)`: Adds `type::bug`
     * `chore(ci)`: Adds `type::chore`
