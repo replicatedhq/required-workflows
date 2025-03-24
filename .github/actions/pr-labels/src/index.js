@@ -71,9 +71,13 @@ async function run() {
     ).data.map((label) => label.name);
     core.debug(`Found ${labels.length} labels: ${labels.join(", ")}`);
 
-    // If labels already exist, skip adding new labels
-    if (labels.length > 0) {
-      core.info("Labels already exist on PR, skipping adding new labels");
+    // Check if any type:: labels already exist
+    const existingTypeLabels = labels.filter(label => label.startsWith("type::"));
+    core.debug(`Found ${existingTypeLabels.length} type labels: ${existingTypeLabels.join(", ")}`);
+
+    // If type labels already exist, skip adding new labels
+    if (existingTypeLabels.length > 0) {
+      core.info("Type labels already exist on PR, skipping adding new labels");
     } else {
       // Get PR details to check for semantic commit messages
       await addSemanticLabels(octokit, labels);
