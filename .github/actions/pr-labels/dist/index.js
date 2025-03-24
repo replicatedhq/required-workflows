@@ -9800,12 +9800,12 @@ const SEMANTIC_TYPE_TO_LABEL = {
 };
 
 /**
- * Extract semantic commit type from a message
+ * Extract semantic type from a PR title
  * Supports formats like:
  * - "feat: add new feature"
  * - "fix(component): fix bug"
  * - "chore: update dependencies"
- * @param {string} message - The commit message or PR title
+ * @param {string} message - The PR title
  * @returns {string|null} - The semantic type or null if not found
  */
 function extractSemanticType(message) {
@@ -9855,7 +9855,7 @@ async function run() {
     if (existingTypeLabels.length > 0) {
       core.info("Type labels already exist on PR, skipping adding new labels");
     } else {
-      // Get PR details to check for semantic commit messages
+      // Get PR details to check for semantic PR title
       await addSemanticLabels(octokit, labels);
     }
 
@@ -9913,7 +9913,7 @@ async function run() {
 }
 
 /**
- * Add labels based on semantic commit messages
+ * Add labels based on semantic PR title
  * @param {object} octokit - GitHub API client
  * @param {string[]} labels - Current labels array to update
  * @returns {Promise<void>}
@@ -9928,46 +9928,24 @@ async function addSemanticLabels(octokit, labels) {
     pull_number: prNumber,
   });
 
-  // Get the PR title and HEAD commit message
+  // Get the PR title
   const prTitle = pullRequest.title;
   core.debug(`PR title: "${prTitle}"`);
 
-  // Get the HEAD commit message
-  core.debug("Fetching PR commits...");
-  const { data: commits } = await octokit.rest.pulls.listCommits({
-    ...github.context.repo,
-    pull_number: prNumber,
-  });
-
-  core.debug(`Found ${commits.length} commits in PR`);
-  const headCommitMessage = commits.length > 0 ? commits[commits.length - 1].commit.message : null;
-  if (headCommitMessage) {
-    core.debug(`HEAD commit message: "${headCommitMessage}"`);
-  } else {
-    core.debug("No HEAD commit message found");
-  }
-
-  // Try to extract semantic type from PR title or HEAD commit
+  // Try to extract semantic type from PR title only
   core.debug("Extracting semantic type from PR title...");
-  const prTitleType = extractSemanticType(prTitle);
-
-  core.debug("Extracting semantic type from HEAD commit...");
-  const commitType = extractSemanticType(headCommitMessage);
-
-  // Use PR title type first, then fall back to commit type
-  const semanticType = prTitleType || commitType;
+  const semanticType = extractSemanticType(prTitle);
+  
   if (semanticType) {
-    core.debug(`Using semantic type: "${semanticType}"`);
+    core.debug(`Using semantic type from PR title: "${semanticType}"`);
   } else {
-    core.debug("No semantic type found in PR title or HEAD commit");
+    core.debug("No semantic type found in PR title");
     return;
   }
 
   // If we found a semantic type that maps to one of our labels, add it if not present
-  if (!semanticType || !SEMANTIC_TYPE_TO_LABEL[semanticType]) {
-    if (semanticType) {
-      core.debug(`Semantic type "${semanticType}" does not map to any of our labels`);
-    }
+  if (!SEMANTIC_TYPE_TO_LABEL[semanticType]) {
+    core.debug(`Semantic type "${semanticType}" does not map to any of our labels`);
     return;
   }
 
@@ -9980,7 +9958,7 @@ async function addSemanticLabels(octokit, labels) {
     return;
   }
 
-  core.info(`Adding label ${labelToAdd} based on semantic commit type: ${semanticType}`);
+  core.info(`Adding label ${labelToAdd} based on semantic PR title type: ${semanticType}`);
 
   core.debug("Calling GitHub API to add label...");
   await octokit.rest.issues.addLabels({
@@ -9994,7 +9972,7 @@ async function addSemanticLabels(octokit, labels) {
   labels.push(labelToAdd);
   core.debug(`Updated local labels array: ${labels.join(", ")}`);
 
-  core.info("Added label based on semantic commit message. Waiting for label to apply...");
+  core.info("Added label based on semantic PR title. Waiting for label to apply...");
   // Short delay to allow the label to be properly registered
   core.debug("Waiting 2 seconds for label to propagate...");
   await new Promise(resolve => setTimeout(resolve, 2000));
